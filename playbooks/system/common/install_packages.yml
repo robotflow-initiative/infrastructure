@@ -1,0 +1,107 @@
+---
+- name: Install Packages By Selection
+  hosts: all
+  become: yes
+  vars_prompt:
+      - name: "apt_install_profiling"
+        prompt: "Install profiling tools (yes, no)"
+        default: "no"
+        private: no
+      - name: "apt_install_network_tools"
+        prompt: "Install network tools (yes, no)"
+        default: "no"
+        private: no
+      - name: "apt_install_cpp_development"
+        prompt: "Install C++ development tools (yes, no)"
+        default: "no"
+        private: no
+      - name: "apt_install_parallel_compute"
+        prompt: "Install Parallel Compute toolkit, e.g. mpich  (yes, no)"
+        default: "no"
+        private: no
+      - name: "apt_install_shared_storage"
+        prompt: "Install Shared Storage Packages, e.g. nfs  (yes, no)"
+        default: "no"
+        private: no
+
+  tasks:
+      - name: Install common packages with apt
+        apt:
+            name:
+                - tree
+                - tmux
+                - bison
+                - curl
+                - wget
+                - nano
+                - p7zip-full
+                - proxychains4
+                - unzip
+                - vim
+                - sysstat
+                - git
+                - jq
+            state: present
+
+      - name: Install profiling tools
+        apt:
+            name:
+                - htop
+                - iotop
+                - iftop
+                - fio
+                - stress
+                - s-tui
+                - cpufrequtils
+                - gpustat
+                - smartmontools
+            state: present
+        when: apt_install_profiling == "yes"
+
+      - name: Install network tools
+        apt:
+            name:
+                - net-tools
+                - qperf
+                - nmap
+                - tcpdump
+                - iperf
+                - iperf3
+                - traceroute
+                - netcat
+                - socat
+                - dnsutils
+                - iputils-ping
+            state: present
+        when: apt_install_network_tools == "yes"
+
+      - name: Install C++ development tools
+        apt:
+            name:
+                - build-essential
+                - cmake
+                - gdb
+                - clang
+                - clang-format
+                - llvm
+                - lldb
+            state: present
+        when: apt_install_cpp_development == "yes"
+
+      - name: Install Parallel Compute toolkit
+        apt:
+            name:
+                - mpich
+                - openmpi-bin
+                - octave
+            state: present
+        when: apt_install_parallel_compute == "yes"
+
+      - name: Install Shared Storage Packages
+        apt:
+            name: 
+              - nfs-common
+              - cifs-utils
+              - autofs
+            state: present
+        when: apt_install_shared_storage == "yes"

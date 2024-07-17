@@ -1,0 +1,69 @@
+---
+- name: Prepare for NVIDIA Driver installation
+  hosts: all
+  become: yes
+  tasks:
+      - name: Detect Nvidia GPU
+        shell: lspci | grep -i nvidia
+        args:
+            executable: /bin/bash
+        register: nvidia_gpu
+        ignore_errors: yes
+        changed_when: false
+
+      - debug:
+            msg: "Nvidia GPU detected: {{ nvidia_gpu.stdout }}"
+        when: nvidia_gpu.rc == 0
+
+      - fail:
+            msg: "No Nvidia GPU detected"
+        when: nvidia_gpu.rc != 0
+
+      - name: Update the apt package index
+        apt:
+            update_cache: yes
+
+      - name: Install necessary prerequisites
+        apt:
+            name:
+                - build-essential
+                - dkms
+                - gcc
+                - linux-headers-{{ ansible_kernel }}
+            state: present
+
+      - name: List available Nvidia drivers
+        command: sudo ubuntu-drivers list --gpgpu
+        register: nvidia_drivers
+
+      - name: Split stdout into a list of lines
+        set_fact:
+            nvidia_gpu_info_lines: "{{ nvidia_drivers.stdout.split('\n') }}"
+
+      - debug:
+            msg: "{{ item }}"
+        loop: "{{ nvidia_gpu_info_lines }}"
+
+- name: Install NVIDIA Driver on Ubuntu Workstation
+  hosts: all
+  become: yes
+
+  vars_prompt:
+      - name: nvidia_driver_version
+        prompt: "Enter the version of the NVIDIA driver to install"
+        private: no
+        default: "535"
+
+  tasks:
+      - name: Install NVIDIA Kernel Module
+        apt:
+            name: nvidia-dkms-{{ nvidia_driver_version }}
+            state: present
+
+      - name: Install NVIDIA Driver
+        apt:
+            name: nvidia-driver-{{ nvidia_driver_version }}
+            state: present
+
+      - warn:
+            msg: "Please reboot your system to load the new NVIDIA driver"

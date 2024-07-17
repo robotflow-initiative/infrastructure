@@ -1,0 +1,111 @@
+---
+- name: Ensure Miniconda is installed
+  hosts: all
+  vars:
+      miniconda_installer: "Miniconda3-latest-Linux.sh"
+      conda_prefix: ""
+
+  tasks:
+      - name: Set conda_prefix to HOME if not set
+        set_fact:
+            conda_prefix: "{{ ansible_env.HOME }}/miniconda3"
+        when: conda_prefix == ""
+
+      - name: Set Correct Arch
+        set_fact:
+            arch: "x86_64"
+        when: ansible_architecture == "x86_64"
+
+      - name: Set Correct Arch
+        set_fact:
+            arch: "aarch64"
+        when: ansible_architecture == "aarch64"
+
+      - name: Set Correct URL
+        set_fact:
+            miniconda_url: "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-{{ arch }}.sh"
+        when: arch == "x86_64"
+
+      - debug:
+            msg: "Miniconda URL is {{ miniconda_url }}"
+
+      - name: Check if Miniconda is already installed
+        stat:
+            path: "{{ conda_prefix }}/bin/conda"
+        register: miniconda_check
+
+      - name: Install Miniconda
+        block:
+            - name: Download Miniconda installer
+              get_url:
+                  url: "{{ miniconda_url }}"
+                  dest: "/tmp/{{ miniconda_installer }}"
+
+            - name: Make Miniconda installer executable
+              file:
+                  path: "/tmp/{{ miniconda_installer }}"
+                  mode: "0755"
+
+            - name: Run Miniconda installer
+              command: "/tmp/{{ miniconda_installer }} -b -p {{ conda_prefix }}"
+
+            - name: Initialize conda
+              command: "{{ conda_prefix }}/bin/conda init"
+
+            - name: Clean up Miniconda installer
+              file:
+                  path: "/tmp/{{ miniconda_installer }}"
+                  state: absent
+
+            - name: Ensure conda is available in the current shell
+              shell: "{{ conda_prefix }}/bin/conda init bash && source ~/.bashrc"
+              args:
+                  executable: /bin/bash
+        when: not miniconda_check.stat.exists
+
+      - name: Verify Miniconda installation
+        command: "{{ conda_prefix }}/bin/conda --version"
+        register: conda_version
+
+      - name: Print Miniconda version
+        debug:
+            msg: "Miniconda version is {{ conda_version.stdout }}"
+
+- name: Configure pip source
+  hosts: all
+  gather_facts: no
+  vars_prompt:
+    - name: "pip_mirror_choice"
+      prompt: "Which pip mirror do you want to use? (no_change, sjtu, tsinghua)"
+      private: no
+
+  tasks:
+    - name: Set pip source URL based on user input
+      set_fact:
+        pip_source_url: >
+          {% if pip_mirror_choice == 'sjtu' %}
+           https://mirror.sjtu.edu.cn/pypi/web/simple
+          {% elif pip_mirror_choice == 'tsinghua' %}
+            https://pypi.tuna.tsinghua.edu.cn/simple
+          {% else %}
+            ''
+          {% endif %}
+
+    - name: Create pip configuration directory
+      file:
+        path: ~/.pip
+        state: directory
+        mode: '0755'
+      when: pip_mirror_choice != 'no_change'
+
+    - name: Configure pip to use the selected mirror
+      shell:
+        pip config set global.index-url {{ pip_source_url }}
+      args:
+        executable: /bin/bash
+      when: pip_mirror_choice != 'no_change'
+
+    - name: Ensure no change if no_change is selected
+      debug:
+        msg: "No change to pip source"
+      when: pip_mirror_choice == 'no_change'

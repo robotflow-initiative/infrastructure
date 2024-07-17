@@ -1,0 +1,95 @@
+---
+- name: Prepare for NVIDIA Container Toolkit installation
+  hosts: all
+  become: yes
+  tasks:
+      - name: Detect Nvidia Driver
+        shell: nvidia-smi
+        args:
+            executable: /bin/bash
+        register: nvidia_gpu
+        ignore_errors: yes
+        changed_when: false
+
+      - debug:
+            msg: "Nvidia Driver is ready"
+        when: nvidia_gpu.rc == 0
+
+      - fail:
+            msg: "Nvidia Driver is not ready"
+        when: nvidia_gpu.rc != 0
+
+- name: Install NVIDIA Container Toolkit
+  hosts: all
+  become: yes
+  tasks:
+      - name: Detect the nvidia-container-toolkit
+        shell: nvidia-ctk --version
+        register: nvidia_ctk
+        ignore_errors: yes
+        changed_when: false
+
+      - debug:
+            msg: "NVIDIA Container Toolkit is ready"
+        when: nvidia_ctk.rc == 0
+
+      - name: Perform NVIDIA Container Toolkit installation
+        block:
+            - name: Download NVIDIA GPG key
+              shell: |
+                  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+            - name: Download NVIDIA repository list and modify it
+              shell: |
+                  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+                  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+                  tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+            - name: Update the packages list from the repository
+              apt:
+                  update_cache: yes
+
+            - name: Install NVIDIA Container Toolkit
+              apt:
+                  name: nvidia-container-toolkit
+                  state: present
+        when: nvidia_ctk.rc != 0
+
+- name: Configure NVIDIA Container Toolkit
+  hosts: all
+  become: yes
+  vars_prompt:
+      - name: "container_engine"
+        prompt: "Enter the container engine you are using (docker/containerd)"
+        default: "docker"
+        private: no
+
+  tasks:
+      - name: Configure NVIDIA Container Toolkit with Docker
+        block:
+            - name: Configure NVIDIA Container Toolkit with Docker
+              shell: nvidia-ctk runtime configure --runtime=docker
+              args:
+                  executable: /bin/bash
+            - name: Restart Docker
+              service:
+                  name: docker
+                  state: restarted
+        when: container_engine == "docker"
+
+      - name: Configure NVIDIA Container Toolkit with Containerd
+        block:
+            - name: Backup the original containerd configuration
+              copy:
+                  src: /etc/containerd/config.toml
+                  dest: /etc/containerd/config.toml.bak
+                  remote_src: yes
+            - name: Configure NVIDIA Container Toolkit with Containerd
+              shell: nvidia-ctk runtime configure --runtime=containerd
+              args:
+                  executable: /bin/bash
+            - name: Restart Containerd
+              service:
+                  name: containerd
+                  state: restarted
+        when: container_engine == "containerd"

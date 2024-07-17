@@ -1,0 +1,81 @@
+---
+- name: Install Docker and configure Docker mirror
+  hosts: all
+  become: yes
+
+  vars_prompt:
+      - name: configure_mirror
+        prompt: "Do you want to configure a Docker Image mirror? (yes/no)"
+        private: no
+      - name: docker_image_mirror_url
+        prompt: "Enter the Docker Image mirror URL (leave blank if not configuring)"
+        private: no
+        default: ""
+      - name: "use_aliyun_mirror"
+        prompt: "Use Aliyun mirror for Docker (yes, no)"
+        default: "no"
+        private: no
+
+  tasks:
+      - name: Set fact for configuring mirror
+        set_fact:
+            configure_mirror_boolean: "{{ configure_mirror | lower == 'yes' }}"
+
+      - name: Install required packages
+        apt:
+            name:
+                - apt-transport-https
+                - ca-certificates
+                - curl
+                - software-properties-common
+            state: present
+            update_cache: yes
+
+      - name: Add Docker GPG key
+        apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+        when: use_aliyun_mirror | lower != 'yes'
+
+      - name: Add Docker GPG key from Aliyun
+        apt_key:
+            url: https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg
+            state: present
+        when: use_aliyun_mirror | lower == 'yes'
+
+      - name: Add Docker repository
+        apt_repository:
+            repo: deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+            state: present
+        when: use_aliyun_mirror | lower != 'yes'
+
+      - name: Add Docker repository from Aliyun
+        apt_repository:
+            repo: deb https://mirrors.aliyun.com/docker-ce/linux/ubuntu {{ ansible_distribution_release }} stable
+            state: present
+        when: use_aliyun_mirror | lower == 'yes'
+
+      - name: Update apt cache
+        apt:
+            update_cache: yes
+
+      - name: Install Docker
+        apt:
+            name: docker-ce
+            state: present
+
+      - name: Configure Docker mirror
+        blockinfile:
+            path: /etc/docker/daemon.json
+            block: |
+                {
+                  "registry-mirrors": ["{{ docker_image_mirror_url }}"]
+                }
+            create: yes
+        when: configure_mirror_boolean
+
+      - name: Restart Docker
+        service:
+            name: docker
+            state: restarted
+        when: configure_mirror_boolean

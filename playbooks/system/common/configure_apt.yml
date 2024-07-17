@@ -1,0 +1,54 @@
+---
+- name: Configure APT mirror
+  hosts: all
+  become: yes
+  vars_prompt:
+      - name: "apt_mirror_option"
+        prompt: "Choose APT mirror (no_change, sjtu, aliyun)"
+        default: "no_change"
+        private: no
+
+  tasks:
+      - name: Backup original sources.list
+        copy:
+            src: /etc/apt/sources.list
+            dest: /etc/apt/sources.list.bak
+            remote_src: yes
+        when: apt_mirror_option != "no_change"
+
+      - name: Configure APT mirror to SJTU
+        block:
+            - name: Set SJTU mirror for Ubuntu
+              copy:
+                  content: |
+                      deb https://mirror.sjtu.edu.cn/ubuntu/ {{ ansible_distribution_release }} main restricted universe multiverse
+                      deb https://mirror.sjtu.edu.cn/ubuntu/ {{ ansible_distribution_release }}-updates main restricted universe multiverse
+                      deb https://mirror.sjtu.edu.cn/ubuntu/ {{ ansible_distribution_release }}-backports main restricted universe multiverse
+                      deb https://mirror.sjtu.edu.cn/ubuntu/ {{ ansible_distribution_release }}-security main restricted universe multiverse
+                  dest: /etc/apt/sources.list
+        when: apt_mirror_option == "sjtu"
+
+      - name: Configure APT mirror to Aliyun
+        block:
+            - name: Set Aliyun mirror for Ubuntu
+              copy:
+                  content: |
+                      deb http://mirrors.aliyun.com/ubuntu/ {{ ansible_distribution_release }} main restricted universe multiverse
+                      deb http://mirrors.aliyun.com/ubuntu/ {{ ansible_distribution_release }}-updates main restricted universe multiverse
+                      deb http://mirrors.aliyun.com/ubuntu/ {{ ansible_distribution_release }}-backports main restricted universe multiverse
+                      deb http://mirrors.aliyun.com/ubuntu/ {{ ansible_distribution_release }}-security main restricted universe multiverse
+                  dest: /etc/apt/sources.list
+        when: apt_mirror_option == "aliyun"
+
+      - name: Update APT package index
+        apt:
+            update_cache: yes
+
+- name: Install Flatpak
+  hosts: all
+  become: yes
+  tasks:
+      - name: Install Flatpak
+        apt:
+            name: flatpak
+            state: present

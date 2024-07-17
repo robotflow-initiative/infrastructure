@@ -1,0 +1,45 @@
+---
+- name: Disable sleep, hibernation on Ubuntu desktop
+  hosts: all
+  become: yes
+  tasks:
+      - name: Disable sleep and hibernate using systemctl
+        block:
+            - name: Mask sleep.target
+              systemd:
+                  name: sleep.target
+                  masked: yes
+
+            - name: Mask suspend.target
+              systemd:
+                  name: suspend.target
+                  masked: yes
+
+            - name: Mask hibernate.target
+              systemd:
+                  name: hibernate.target
+                  masked: yes
+
+            - name: Mask hybrid-sleep.target
+              systemd:
+                  name: hybrid-sleep.target
+                  masked: yes
+
+- name: Disable auto updates on Ubuntu desktop
+  hosts: all
+  become: yes
+  tasks:
+      - name: Disable automatic updates
+        block:
+            - name: Stop and disable unattended-upgrades service
+              systemd:
+                  name: unattended-upgrades
+                  enabled: no
+                  state: stopped
+
+            - name: Disable automatic updates in APT configuration
+              copy:
+                  dest: /etc/apt/apt.conf.d/20auto-upgrades
+                  content: |
+                      APT::Periodic::Update-Package-Lists "0";
+                      APT::Periodic::Unattended-Upgrade "0";

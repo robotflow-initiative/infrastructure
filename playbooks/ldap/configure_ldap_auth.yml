@@ -1,0 +1,106 @@
+---
+- name: Configure LDAP server
+  hosts: all
+  become: yes
+
+  vars_prompt:
+      - name: ldap_server_uri
+        prompt: "Enter the LDAP server uri, e.g. ldap://127.0.0.1:389/"
+        private: no
+
+      - name: ldap_base_dn
+        prompt: "Enter the LDAP base DN, e.g. dc=robotflow,dc=ai"
+        default: "dc=robotflow,dc=ai"
+        private: no
+
+      - name: ldap_bind_dn
+        prompt: "Enter the LDAP bind DN, e.g. cn=admin,dc=robotflow,dc=ai"
+        default: "cn=admin,dc=robotflow,dc=ai"
+        private: no
+
+      - name: ldap_bind_pw
+        prompt: "Enter the LDAP bind password"
+        private: yes
+
+  tasks:
+      - name: Install packages
+        apt:
+            name:
+                - libpam-ldapd
+                - ldap-utils
+                - nslcd
+                - nscd
+            state: present
+            update_cache: yes
+
+      - name: Configure /etc/nsswitch.conf
+        copy:
+            dest: /etc/nsswitch.conf
+            content: |
+                passwd:         files ldap systemd
+                group:          files ldap systemd
+                shadow:         files ldap
+                gshadow:        files
+                hosts:          files dns
+                networks:       files
+                protocols:      db files
+                services:       db files
+                ethers:         db files
+                rpc:            db files
+                netgroup:       nis
+
+      - name: Configure /etc/nslcd.conf
+        copy:
+            dest: /etc/nslcd.conf
+            content: |
+                uid nslcd
+                gid nslcd
+                uri ldap://100.99.97.106:30389/
+                base {{ ldap_base_dn }}
+                binddn {{ ldap_bind_dn }}
+                bindpw {{ ldap_bind_pw }}
+                tls_cacertfile /etc/ssl/certs/ca-certificates.crt
+                filter passwd (objectClass=person)
+                map passwd uid uid
+                map passwd homeDirectory "/home/$uid"
+                filter shadow (objectClass=person)
+                map shadow uid sAMAccountName
+                filter group (&(|(objectclass=groupOfUniqueNames)(objectclass=posixGroup))(|(cn=admins)(cn=engineers)(cn=professors)(cn=students)(cn=bots-unix)))
+
+      - name: Configure /etc/pam.d/common-password
+        copy:
+            dest: /etc/pam.d/common-password
+            content: |
+                password        [success=2 default=ignore]      pam_unix.so obscure sha512
+                password        [success=1 default=ignore]      pam_ldap.so minimum_uid=1000 try_first_pass
+                password        requisite                       pam_deny.so
+                password        required                        pam_permit.so
+                password        optional        pam_gnome_keyring.so
+
+      - name: Configure /etc/pam.d/common-session
+        copy:
+            dest: /etc/pam.d/common-session
+            content: |
+                session [default=1]                     pam_permit.so
+                session requisite                       pam_deny.so
+                session required                        pam_permit.so
+                session optional                        pam_umask.so
+                session required        pam_unix.so
+                session [success=ok default=ignore]     pam_ldap.so minimum_uid=1000
+                session optional        pam_systemd.so
+                session required pam_mkhomedir.so skel=/etc/skel umask=0022
+
+      - name: Restart nscd service
+        service:
+            name: nscd
+            state: restarted
+
+      - name: Restart sshd service
+        service:
+            name: sshd
+            state: restarted
+
+      - name: Restart nslcd service
+        service:
+            name: nslcd
+            state: restarted

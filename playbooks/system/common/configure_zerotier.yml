@@ -1,0 +1,41 @@
+---
+- name: Join ZeroTier network
+  hosts: all
+  become: yes
+  vars_prompt:
+      - name: zerotier_network_id
+        prompt: "Enter the ZeroTier network ID to join"
+        private: no
+
+  tasks:
+      - name: Check if ZeroTier is already installed
+        stat:
+            path: /var/lib/zerotier-one
+        register: zerotier_installed
+
+      - name: Install ZeroTier
+        block:
+            - name: Install dependencies
+              apt:
+                  name:
+                      - curl
+                  state: present
+
+            - name: Download and run ZeroTier install script
+              shell: curl -s https://install.zerotier.com | bash
+              args:
+                  creates: /var/lib/zerotier-one
+
+            - name: Enable and start ZeroTier service
+              systemd:
+                  name: zerotier-one
+                  enabled: yes
+                  state: started
+        when: not zerotier_installed.stat.exists
+
+      - name: Join ZeroTier network
+        shell: zerotier-cli join {{ zerotier_network_id }}
+        args:
+            executable: /bin/bash
+        register: join_output
+        changed_when: "'200 join OK' in join_output.stdout"
