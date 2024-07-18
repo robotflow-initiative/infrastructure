@@ -1,4 +1,6 @@
-# RobotFlow Ansible Playbooks
+# RobotFlow Infrastructure
+
+This repository contains infrastructure code for [RobotFlow](robotflow.ai)
 
 ## Get-Started
 
