@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    k8s-app: apps.ldap-proxy
+  name: ldap-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: apps.ldap-proxy
+  template:
+    metadata:
+      labels:
+        k8s-app: apps.ldap-proxy
+    spec:
+      containers:
+        - name: container-0
+          image: docker.io/davidliyutong/ldap-proxy:0.3-amd64 # docker.io/davidliyutong/ldap-proxy:0.3-arm64 for Arm based deployment
+          imagePullPolicy: IfNotPresent
+          ports:
+          - name: 8080tcp
+            containerPort: 8080
+            protocol: TCP
+          env:
+          - name: LDAP_HOST
+            value: "FIXME" # Or ldaps://
+          - name: LDAP_PORT
+            value: "389" # Or 646 if using LDAPS protocal
+          - name: LDAP_BASE_DN
+            value: "dc=robotflow,dc=ai"
+          - name: LDAP_BIND_USER
+            value: "FIXME"
+          - name: LDAP_BIND_PASSWORD
+            value: "FIXME" # Bind password for LDAP_BIND_USER
+          - name: LDAP_USER_DN
+            value: "uid={},ou=users,dc=robotflow,dc=ai" # '{}' will be replaced by username
+          - name: LDAP_SEARCH_DN
+            value: "(uid={})" # '{}' will be replaced by username
+          - name: DEBUG
+            value: "1"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ldap-proxy
+spec:
+  type: ClusterIP
+  selector:
+    k8s-app: apps.ldap-proxy
+  ports:
+    - name: https
+      port: 80
+      protocol: TCP
+      targetPort: 8080

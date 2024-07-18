@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: developement
+  name: pod1
+  labels:
+    app: pod1
+spec:
+  # nodeName:
+  containers:
+  - name: ct-ubuntu
+    image: ubuntu:20.04
+    imagePullPolicy: IfNotPresent
+    command: ['/bin/sh', '-c', 'echo pod1 is running! & sleep 3000']
