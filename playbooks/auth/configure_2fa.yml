@@ -1,0 +1,67 @@
+---
+- name: Configure TOTP 2FA
+  hosts: all
+  become: yes
+
+  tasks:
+      - name: Install required packages
+        apt:
+            name:
+                - libpam-google-authenticator
+            state: present
+            update_cache: yes
+
+      - name: Detect if /etc/pam.d/sshd is configured for 2FA
+        shell: grep pam_google_authenticator.so /etc/pam.d/sshd
+        ignore_errors: yes
+        register: pam_sshd_2fa
+
+      - name: Set fact for configuring 2FA
+        set_fact:
+            configure_2fa_boolean: "{{ pam_sshd_2fa.stdout == '' }}"
+
+      - name: Configure /etc/pam.d/sshd for 2FA
+        block:
+            - name: Backup /etc/pam.d/sshd
+              copy:
+                  src: /etc/pam.d/sshd
+                  dest: /etc/pam.d/sshd.bak
+                  remote_src: yes
+
+            - name: Configure /etc/pam.d/sshd
+              blockinfile:
+                  path: /etc/pam.d/sshd
+                  block: |
+                      auth required pam_google_authenticator.so nullok
+                      auth required pam_permit.so
+        when: configure_2fa_boolean
+
+      - name: Detect if /etc/ssh/sshd_config is configured for 2FA
+        shell: grep "ChallengeResponseAuthentication yes" /etc/ssh/sshd_config
+        ignore_errors: yes
+        register: sshd_2fa
+      
+      - name: Set fact for configuring 2FA
+        set_fact:
+            configure_2fa_boolean: "{{ sshd_2fa.stdout == '' }}"
+        
+      - name: Configure /etc/ssh/sshd_config for 2FA
+        block:
+            - name: Backup /etc/ssh/sshd_config
+              copy:
+                  src: /etc/ssh/sshd_config
+                  dest: /etc/ssh/sshd_config.bak
+                  remote_src: yes
+
+            - name: Configure /etc/ssh/sshd_config
+              lineinfile:
+                  path: /etc/ssh/sshd_config
+                  regexp: '^#?ChallengeResponseAuthentication'
+                  line: ChallengeResponseAuthentication yes
+          
+            - name: Restart sshd
+              service:
+                  name: sshd
+                  state: restarted
+        when: configure_2fa_boolean
+

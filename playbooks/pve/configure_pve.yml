@@ -1,0 +1,111 @@
+---
+- name: Configure PVE Node
+  hosts: all
+  become: yes
+  vars_prompt:
+    - name: "import_ssh_keys"
+      prompt: "Do you want to import SSH keys from GitHub? (yes, no)"
+      default: "yes"
+      private: no
+    - name: "github_username"
+      prompt: "Enter the GitHub username, leave blank if not importing SSH keys"
+      private: no
+
+  tasks:
+    - name: Update apt repository
+      apt:
+        update_cache: yes
+
+    - name: Install essential packages
+      apt:
+        name:
+          - wget
+          - zsh
+          - git
+          - curl
+        state: present
+
+    - name: Generate SSH key
+      user:
+        name: "{{ ansible_user }}"
+        generate_ssh_key: yes
+        ssh_key_bits: 2048
+        ssh_key_file: .ssh/id_rsa
+
+    - name: Import SSH keys from GitHub
+      shell: "curl -s https://github.com/{{ github_username }}.keys >> .ssh/authorized_keys"
+      args:
+        executable: /bin/bash
+      when: import_ssh_keys == "yes"
+
+    - name: Download and extract pvetools
+      get_url:
+        url: https://pub-75e01a31d4044cfbad6ee9f5d35e694f.r2.dev/pvetools.tar.gz
+        dest: /tmp/pvetools.tar.gz
+
+    - name: Extract pvetools
+      unarchive:
+        src: /tmp/pvetools.tar.gz
+        dest: "{{ ansible_env.HOME }}"
+        remote_src: yes
+
+    - name: Remove pvetools archive
+      file:
+        path: /tmp/pvetools.tar.gz
+        state: absent
+
+    - name: Download and extract oh-my-zsh
+      get_url:
+        url: https://pub-75e01a31d4044cfbad6ee9f5d35e694f.r2.dev/oh-my-zsh.tar
+        dest: /tmp/oh-my-zsh.tar
+
+    - name: Extract oh-my-zsh
+      unarchive:
+        src: /tmp/oh-my-zsh.tar
+        dest: "{{ ansible_env.HOME }}"
+        remote_src: yes
+
+    - name: Remove oh-my-zsh archive
+      file:
+        path: /tmp/oh-my-zsh.tar
+        state: absent
+
+    - name: Install additional system utilities
+      apt:
+        name:
+          - htop
+          - iotop
+          - iftop
+          - net-tools
+          - iputils-ping
+          - dnsutils
+          - traceroute
+          - nvme-cli
+          - smartmontools
+          - fio
+          - stress
+          - s-tui
+          - ipmitool
+          - vim
+          - nano
+          - sudo
+          - openvswitch-switch
+        state: present
+
+    - name: Install Infiniband related packages
+      apt:
+        name:
+          - mstflint
+          - infiniband-diags
+          - rdma-core
+          - libibverbs1
+          - librdmacm1
+          - libibmad5
+          - libibumad3
+          - librdmacm1
+          - ibverbs-providers
+          - rdmacm-utils
+          - infiniband-diags
+          - libfabric1
+          - ibverbs-utils
+        state: present

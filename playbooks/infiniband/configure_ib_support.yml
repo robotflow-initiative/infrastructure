@@ -1,0 +1,61 @@
+---
+- name: Setup Infiniband on Ubuntu Server
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check Operating System
+      block:
+        - name: Check if OS is Ubuntu
+          fail:
+            msg: "This playbook is only for Ubuntu"
+          when: ansible_distribution != 'Ubuntu'
+
+    - name: Update apt repository and install mstflint
+      apt:
+        update_cache: yes
+        name: mstflint
+        state: present
+
+    - name: Ensure IB modules are loaded at boot
+      lineinfile:
+        path: /etc/modules
+        line: "{{ item }}"
+        state: present
+      loop:
+        - ib_ipoib
+        - ib_umad
+
+    - name: Load IB modules
+      shell: |
+        modprobe ib_ipoib
+        modprobe ib_umad
+      args:
+        executable: /bin/bash
+
+    - name: Install Infiniband diagnostic tools
+      apt:
+        name: infiniband-diags
+        state: present
+
+    - name: Install RDMA core and related libraries
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - rdma-core
+        - libibverbs1
+        - librdmacm1
+        - libibmad5
+        - libibumad3
+        - librdmacm1
+        - ibverbs-providers
+        - rdmacm-utils
+        - infiniband-diags
+        - libfabric1
+        - ibverbs-utils
+
+    - name: Install qperf
+      apt:
+        name: iperf
+        state: present
