@@ -1,4 +1,4 @@
-# Auth Playbook
+# Auth Playbooks
 
 | Name                      | Description                   | Require Root | Distribution |
 | ------------------------- | ----------------------------- | ------------ | ------------ |

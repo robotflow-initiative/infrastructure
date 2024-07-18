@@ -40,5 +40,6 @@ TBD.
 ## TODO
 
 - [ ] Test rke2 server with nvidia_container and external_containerd and docker compatibility
-- [ ] Test ldap playbook
+- [ ] Test playbook/rke2
+- [ ] Test auth/ldap playbook
 - [ ] Update Catalog

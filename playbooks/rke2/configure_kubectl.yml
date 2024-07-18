@@ -1,0 +1,21 @@
+---
+  - name: Prepare Kubectl for User
+    hosts: all
+    tasks:
+      - name: Ensure destination directory exists
+        file:
+            path: "/home/{{ ansible_user }}/.kube"
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+            state: directory
+            mode: "0755"
+
+      - name: Copy the Kubeconfig file
+        copy:
+            src: /etc/rancher/rke2/rke2.yaml
+            dest: "/home/{{ ansible_user }}/.kube/config"
+            remote_src: yes
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+            mode: "0600"
+        become: yes

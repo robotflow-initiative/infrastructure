@@ -53,11 +53,6 @@
         prompt: "Enter RKE2 version"
         default: "v1.25.11+rke2r1"
   tasks:
-      - name: Check operating system
-        fail:
-            msg: "This playbook can only be run on Ubuntu."
-        when: ansible_distribution not in ['Ubuntu']
-
       - name: Check if /usr/bin/docker exists
         stat:
             path: /usr/bin/docker
@@ -135,33 +130,13 @@
                       debug: false
                   dest: /etc/crictl.yaml
 
+      - name: Add Kubectl to path
+        lineinfile:
+            path: /etc/profile
+            line: "export PATH=$PATH:/var/lib/rancher/rke2/bin"
+
       - name: Enable RKE2 Server Service
         systemd:
             name: rke2-server.service
             enabled: yes
-            state: started
-
-      - name: Prepare Kubectl
-        block:
-            - name: Install Kubectl
-              lineinfile:
-                  path: /etc/profile
-                  line: "export PATH=$PATH:/var/lib/rancher/rke2/bin"
-
-            - name: Ensure destination directory exists
-              file:
-                  path: "/home/{{ ansible_user }}/.kube"
-                  owner: "{{ ansible_user }}"
-                  group: "{{ ansible_user }}"
-                  state: directory
-                  mode: "0755"
-              become: yes
-
-            - name: Copy the Kubeconfig file
-              copy:
-                  src: /etc/rancher/rke2/rke2.yaml
-                  dest: "/home/{{ ansible_user }}/.kube/config"
-                  remote_src: yes
-                  owner: "{{ ansible_user }}"
-                  group: "{{ ansible_user }}"
-                  mode: "0600"
+            # state: started

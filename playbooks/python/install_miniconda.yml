@@ -57,7 +57,7 @@
                   path: "/tmp/{{ miniconda_installer }}"
                   state: absent
 
-            - name: Ensure conda is available in the current shell
+            - name: Ensure conda is available in the bash
               shell: "{{ conda_prefix }}/bin/conda init bash && source ~/.bashrc"
               args:
                   executable: /bin/bash

@@ -1,4 +1,4 @@
-# Nvidia Driver Playbook
+# Nvidia Driver Playbooks
 
 | Name                                               | Description                                         | Require Root | Distribution   |
 | -------------------------------------------------- | --------------------------------------------------- | ------------ | -------------- |
