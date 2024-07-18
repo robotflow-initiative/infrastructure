@@ -39,3 +39,8 @@
             executable: /bin/bash
         register: join_output
         changed_when: "'200 join OK' in join_output.stdout"
+
+      - name: Set AllowGlobal
+        shell: zerotier-cli set {{ zerotier_network_id }} allowGlobal=true
+        args:
+            executable: /bin/bash

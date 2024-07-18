@@ -7,20 +7,6 @@
             msg: "This playbook can only be run on Ubuntu."
         when: ansible_distribution != 'Ubuntu'
 
-      - name: Disable AppArmor
-        block:
-            - name: Check if AppArmor is running
-              shell: aa-status --enabled
-              register: apparmor_status
-              failed_when: false
-              changed_when: false
-
-            - name: Disable AppArmor if it is running
-              block:
-                  - name: Disable AppArmor
-                    shell: systemctl stop apparmor && systemctl disable apparmor
-              when: apparmor_status.rc == 0
-
       - name: Configure io watcher
         sysctl:
             name: fs.inotify.max_user_instances

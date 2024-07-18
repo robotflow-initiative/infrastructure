@@ -1,0 +1,45 @@
+---
+- name: Configure oh-my-zsh with plugins
+  hosts: all
+  tasks:
+    - name: Check if zsh is installed
+      command: which zsh
+      register: zsh_check
+      ignore_errors: yes
+
+    - name: Throw error if zsh is not installed
+      fail:
+        msg: "zsh is not installed. Please install zsh before running this playbook."
+      when: zsh_check.rc != 0
+      
+    - name: Install oh-my-zsh
+      shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+      args:
+        creates: "{{ ansible_env.HOME }}/.oh-my-zsh"
+
+    - name: Install zsh-autosuggestions plugin
+      git:
+        repo: https://github.com/zsh-users/zsh-autosuggestions
+        dest: "{{ ansible_env.HOME }}/.oh-my-zsh/custom/plugins/zsh-autosuggestions"
+
+    - name: Install zsh-syntax-highlighting plugin
+      git:
+        repo: https://github.com/zsh-users/zsh-syntax-highlighting
+        dest: "{{ ansible_env.HOME }}/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
+
+    - name: Ensure plugins are added to .zshrc
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        regexp: '^plugins='
+        line: 'plugins=(git extract vscode zsh-autosuggestions zsh-syntax-highlighting sudo)'
+        create: yes
+
+    - name: Modify the PROMPT
+      lineinfile:
+        path: "{{ ansible_env.HOME }}/.zshrc"
+        line: 'PROMPT=%m\ $PROMPT'
+
+    - name: Source .zshrc to apply changes
+      shell: source {{ ansible_env.HOME }}/.zshrc
+      args:
+        executable: /bin/zsh

@@ -1,0 +1,34 @@
+---
+- name: Configure oh-my-zsh with plugins
+  hosts: all
+  tasks:
+    - name: Check if zsh is installed
+      command: which zsh
+      register: zsh_check
+      ignore_errors: yes
+
+    - name: Throw error if zsh is not installed
+      fail:
+        msg: "zsh is not installed. Please install zsh before running this playbook."
+      when: zsh_check.rc != 0
+
+    - name: Install oh-my-zsh
+      shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+      args:
+        creates: "{{ ansible_env.HOME }}/.oh-my-zsh"
+
+    - name: Download ZSH archive
+      get_url:
+        url: https://pub-75e01a31d4044cfbad6ee9f5d35e694f.r2.dev/oh-my-zsh.tar
+        dest: "{{ ansible_env.HOME }}/oh-my-zsh.tar"
+
+    - name: Extract ZSH archive
+      unarchive:
+        src: "{{ ansible_env.HOME }}/oh-my-zsh.tar"
+        dest: "{{ ansible_env.HOME }}"
+        remote_src: yes
+
+    - name: Delete ZSH archive
+      file:
+        path: "{{ ansible_env.HOME }}/oh-my-zsh.tar"
+        state: absent
