@@ -43,5 +43,6 @@ TBD.
 
 - [ ] Test rke2 server with nvidia_container and external_containerd and docker compatibility
 - [ ] Test playbook/rke2
+- [ ] Add more content about k8s apps
 - [ ] Test auth/ldap playbook
 - [ ] Update Catalog
