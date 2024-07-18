@@ -1,0 +1,58 @@
+---
+- name: Configure NTP server
+  hosts: all
+  become: yes
+  vars_prompt:
+      - name: ntp_server
+        prompt: "Enter the NTP server address"
+        private: no
+
+  tasks:
+      - name: Install ntp package (RedHat family)
+        dnf:
+            name: ntp
+            state: present
+        when: ansible_os_family == "RedHat"
+
+      - name: Install ntp package (Debian family)
+        apt:
+            name: ntp
+            state: present
+            update_cache: yes
+        when: ansible_os_family == "Debian"
+
+      - name: Configure NTP server
+        lineinfile:
+            path: "/etc/ntp.conf"
+            line: "server {{ ntp_server }} iburst"
+            create: no
+        when : ansible_distribution != 'Debian'
+
+      - name: Configure NTP server
+        lineinfile:
+            path: "/etc/ntpsec/ntp.conf"
+            line: "server {{ ntp_server }} iburst"
+            create: no
+        when: ansible_distribution == 'Debian'
+
+      - name: Restart NTP service (RedHat family)
+        service:
+            name: ntpd
+            state: restarted
+            enabled: yes
+        when: ansible_os_family == "RedHat"
+
+      - name: Restart NTP service (Debian family)
+        service:
+            name: ntp
+            state: restarted
+            enabled: yes
+        when: ansible_os_family == "Debian"
+
+      - name: Exam NTP status
+        command: ntpq -p
+        register: ntp_status
+
+      - name: Show NTP status
+        debug:
+            var: ntp_status.stdout_lines
