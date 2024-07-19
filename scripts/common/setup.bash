@@ -6,7 +6,7 @@ set_hostname() {
   if [[ "$set_hostname_choice" == "yes" ]]; then
     echo "Please enter the desired hostname: "
     read NEW_HOSTNAME
-    sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+    hostnamectl set-hostname "$NEW_HOSTNAME"
     echo "Hostname set to $NEW_HOSTNAME"
   else
     echo "Hostname setting skipped"
@@ -16,8 +16,8 @@ set_hostname() {
 # Function to install SSH server
 install_ssh_server() {
   echo "Installing SSH server..."
-  sudo apt update
-  sudo apt install -y openssh-server curl 
+  apt update
+  apt install -y openssh-server curl 
   echo "SSH server installed."
 }
 
@@ -59,16 +59,22 @@ add_github_keys() {
             read -p "Enter the username for the admin account: " admin_username
         fi
 
-        sudo mkdir -p /home/$admin_username/.ssh
+        mkdir -p /home/$admin_username/.ssh
         curl "https://github.com/$github_username.keys" | sudo tee -a /home/$admin_username/.ssh/authorized_keys
-        sudo chown -R "$admin_username:$admin_username" /home/$admin_username/.ssh
-        sudo chmod 600 /home/$admin_username/.ssh/authorized_keys
+        chown -R "$admin_username:$admin_username" /home/$admin_username/.ssh
+        chmod 600 /home/$admin_username/.ssh/authorized_keys
         echo "GitHub SSH keys added to $admin_username's account."
     fi
 }
 
 # Main script logic
 set -e
+
+# Check if the script is run as root
+if [ "$(id -u)" -ne 0 ]; then
+  echo "This script must be run as root" 1>&2
+  exit 1
+fi
 
 set_hostname
 install_ssh_server
