@@ -68,7 +68,6 @@
                 - iperf
                 - iperf3
                 - traceroute
-                - netcat
                 - socat
                 - dnsutils
                 - iputils-ping

@@ -7,11 +7,12 @@
       register: zsh_check
       ignore_errors: yes
 
-    - name: Throw error if zsh is not installed
-      fail:
-        msg: "zsh is not installed. Please install zsh before running this playbook."
+    - name: Install zsh
+      apt:
+        name: zsh
+        state: present
       when: zsh_check.rc != 0
-      
+
     - name: Install oh-my-zsh
       shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
       args:

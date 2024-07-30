@@ -36,9 +36,9 @@ ansible-playbook -i inventory/dev.ini playbooks/workstaion/...
 The `scripts/workstation/setup.bash` can be used to quickly bootstrap a host with openssh-server, create admin user and configure hostname.
 
 ```shell
-curl -sSL https://raw.githubusercontent.com/robotflow-initiative/infrastructure/main/scripts/common/setup.bash | sudo bash
+curl -sSL https://raw.githubusercontent.com/robotflow-initiative/infrastructure/main/scripts/common/setup.bash -o setup.bash
+sudo bash setup.bash
 ```
-
 
 ## Catalog
 
