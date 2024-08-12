@@ -12,7 +12,7 @@
         private: no
         default: ""
       - name: "use_aliyun_mirror"
-        prompt: "Use Aliyun mirror for Docker (yes, no)"
+        prompt: "Use Aliyun mirror for Docker Installation (yes, no)"
         default: "no"
         private: no
 

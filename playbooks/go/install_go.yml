@@ -28,7 +28,7 @@
       when: use_ustc_mirror | lower == 'yes'
 
     - name: Ensure necessary dependencies are installed
-      apt:
+      package:
         name: "{{ item }}"
         state: present
       with_items:
