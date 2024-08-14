@@ -1,0 +1,37 @@
+# Noto: upgrade to 5.15 kernel so that ax211 can be automatically driven.
+---
+- name: Install backport-iwlwifi-dkms from Launchpad
+  hosts: all
+  become: yes
+  tasks:
+    - name: Check Operating System
+      block:
+        - name: Check if OS is Ubuntu
+          fail:
+            msg: "This playbook is only for Ubuntu"
+          when: ansible_distribution != 'Ubuntu'
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name: 
+          - dkms
+          - backport-iwlwifi-dkms
+        state: present
+
+    - name: Download backport-iwlwifi-dkms package
+      get_url:
+        url: http://ports.ubuntu.com/pool/universe/b/backport-iwlwifi-dkms/backport-iwlwifi-dkms_9858-0ubuntu3_all.deb
+        dest: /tmp/backport-iwlwifi-dkms.deb
+
+    - name: Install backport-iwlwifi-dkms package
+      apt:
+        deb: /tmp/backport-iwlwifi-dkms.deb
+
+    - name: Clean up downloaded package
+      file:
+        path: /tmp/backport-iwlwifi-dkms.deb
+        state: absent

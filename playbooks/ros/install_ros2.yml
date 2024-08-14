@@ -1,0 +1,65 @@
+---
+- name: Install ROS2 on Ubuntu
+  hosts: all
+  become: yes
+
+  vars_prompt:
+      - name: "ros2_distro"
+        prompt: "Enter the ROS2 distribution (e.g., foxy, galactic, humble)"
+        private: no
+        default: "foxy"
+
+      - name: "ros_mirror"
+        prompt: "Enter 'ustc' for USTC mirror, leave empty to use the default ROS mirror"
+        private: no
+        default: ""
+
+  tasks:
+      - name: Check if the target OS is Ubuntu
+        ansible.builtin.assert:
+            that:
+                - ansible_facts['os_family'] == "Debian"
+                - ansible_facts['distribution'] == "Ubuntu"
+            msg: "This playbook only supports Ubuntu."
+
+      - name: Set ROS mirror URL
+        set_fact:
+            ros_mirror_url: >-
+                {% if ros_mirror == "ustc" %}
+                http://mirrors.ustc.edu.cn/ros2/ubuntu
+                {% else %}
+                http://packages.ros.org/ros2/ubuntu
+                {% endif %}
+
+      - name: Check if ROS2 is already installed
+        stat:
+            path: "/opt/ros/{{ ros2_distro }}/setup.bash"
+        register: ros2core_path
+
+      - name: Instal ROS2
+        block:
+            - name: Add ROS2 keyring
+              apt_key:
+                  url: "https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc"
+                  state: present
+
+            - name: Get DEB architecture
+              shell: dpkg --print-architecture
+              register: deb_architecture
+
+            - name: Add ROS2 repository
+              apt_repository:
+                  repo: "deb [arch={{ deb_architecture.stdout }}] {{ ros_mirror_url }} {{ ansible_distribution_release }} main"
+                  state: present
+
+            - name: Update apt cache
+              apt:
+                  update_cache: yes
+
+            - name: Install ROS2 {{ ros2_distro }}
+              apt:
+                  name:
+                      - "ros-{{ ros2_distro }}-desktop"
+                      - "ros-dev-tools"
+                  state: present
+        when: not ros2core_path.stat.exists

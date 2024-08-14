@@ -8,6 +8,7 @@
       ignore_errors: yes
 
     - name: Install zsh
+      become: yes
       apt:
         name: zsh
         state: present

@@ -1,0 +1,81 @@
+---
+- name: Install ROS1 on Ubuntu
+  hosts: all
+  become: yes
+
+  vars_prompt:
+      - name: "ros_distro"
+        prompt: "Enter the ROS1 distribution (e.g., noetic, melodic, kinetic)"
+        private: no
+        default: noetic
+
+      - name: "ros_mirror"
+        prompt: "Enter 'ustc' for USTC mirror, leave empty to use the default ROS mirror"
+        private: no
+        default: ""
+
+  tasks:
+      - name: Check if the target OS is Ubuntu
+        ansible.builtin.assert:
+            that:
+                - ansible_facts['os_family'] == "Debian"
+                - ansible_facts['distribution'] == "Ubuntu"
+            msg: "This playbook only supports Ubuntu."
+
+      - name: Set ROS mirror URL
+        set_fact:
+            ros_mirror_url: >-
+                {% if ros_mirror == "ustc" %}
+                http://mirrors.ustc.edu.cn/ros/ubuntu
+                {% else %}
+                http://packages.ros.org/ros/ubuntu
+                {% endif %}
+
+      - name: Check if ROS is already installed
+        stat:
+            path: "/opt/ros/{{ ros_distro }}/setup.bash"
+        register: roscore_path
+
+      - name: Instal ROS1
+        block:
+            - name: Add ROS keyring
+              apt_key:
+                  url: "https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc"
+                  state: present
+
+            - name: Add ROS repository
+              apt_repository:
+                  repo: "deb {{ ros_mirror_url }} {{ ansible_distribution_release }} main"
+                  state: present
+
+            - name: Update apt cache
+              apt:
+                  update_cache: yes
+
+            - name: Install ROS1 {{ ros_distro }}
+              apt:
+                  name: "ros-{{ ros_distro }}-desktop-full"
+                  state: present
+
+        when: not roscore_path.stat.exists
+
+      - name: Install Dependencies for building packages
+        block:
+            - name: Install python3-rosdep
+              apt:
+                  name:
+                      - python3-rosdep
+                      - python3-rosinstall
+                      - python3-rosinstall-generator
+                      - python3-wstool
+                      - build-essential
+                  state: present
+
+            - name: Initialize rosdep
+              command: "rosdep init"
+              become: yes
+              args:
+                  creates: "/etc/ros/rosdep/sources.list.d/20-default.list"
+
+            - name: Update rosdep
+              command: "rosdep update"

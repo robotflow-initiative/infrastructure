@@ -104,6 +104,15 @@
       args:
         executable: /bin/bash
       when: pip_mirror_choice != 'no_change'
+      ignore_errors: yes
+
+    - name: Configure pip3 to use the selected mirror
+      shell:
+        pip3 config set global.index-url {{ pip_source_url }}
+      args:
+        executable: /bin/bash
+      when: pip_mirror_choice != 'no_change'
+      ignore_errors: yes
 
     - name: Ensure no change if no_change is selected
       debug:
