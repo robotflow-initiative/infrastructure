@@ -1,0 +1,27 @@
+touch unifi-network-application/.keep
+touch netflow/.keep
+touch suricata/.keep
+touch powerdns/.keep
+touch netbird/.keep
+touch defguard/.keep
+touch packetfence/.keep
+touch wazuh/.keep
+touch zabiix/.keep
+touch librensm/.keep
+touch openvas/.keep
+touch opencve/.keep
+touch jumpserver/.keep
+touch awx/.keep
+touch netbox/.keep
+touch influxdb/.keep
+touch elasticsearch/.keep
+touch makeplane/.keep
+touch jenkins/.keep
+touch wiki.js/.keep
+touch guacamole/.keep
+touch lakefs/.keep
+touch quilt/.keep
+touch olah/.keep
+touch openmetadata/.keep
+touch velero/.keep
+
