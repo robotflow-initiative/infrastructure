@@ -1,0 +1,143 @@
+---
+- name: Prepare system for Kubernetes
+  hosts: all
+  become: yes
+  tasks:
+      - name: Check operating system
+        fail:
+            msg: "This playbook can only be run on Ubuntu."
+        when: ansible_distribution != 'Ubuntu'
+
+      - name: Configure io watcher
+        sysctl:
+            name: fs.inotify.max_user_instances
+            value: "8192"
+            state: present
+            reload: yes
+
+      - name: Create NetworkManager configuration file
+        copy:
+            dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+            content: |
+                [keyfile]
+                unmanaged-devices=interface-name:cali*;interface-name:flannel*
+            owner: root
+            group: root
+            mode: "0644"
+
+      - name: Reload NetworkManager
+        systemd:
+            name: NetworkManager
+            state: reloaded
+
+      - name: Disable UFW # UFW is incompatible with Calico
+        systemd:
+            name: ufw
+            state: stopped
+            enabled: no
+
+- name: Install RKE2
+  hosts: all
+  become: yes
+  vars_prompt:
+      - name: "use_external_containerd"
+        prompt: "Do you want to use external containerd? (yes/no)"
+        private: no
+        default: "no"
+      - name: "service_node_port_range"
+        prompt: "Enter service-node-port-range"
+        default: "30000-40000"
+      - name: "cni"
+        prompt: "Enter cni"
+        default: "canal"
+      - name: "rke2_version"
+        prompt: "Enter RKE2 version"
+        default: "v1.25.11+rke2r1"
+  tasks:
+      - name: Check if /usr/bin/docker exists
+        stat:
+            path: /usr/bin/docker
+        register: docker_result
+
+      - fail:
+            msg: "Docker is not installed. Please install Docker first."
+        when: docker_result.stat.exists != True
+
+      - name: Check if /usr/local/bin/rke2 exists
+        stat:
+            path: /usr/local/bin/rke2
+        register: rke2_result
+
+      - name: Install RKE2
+        shell: |
+            curl -sfL https://rancher-mirror.rancher.cn/rke2/install.sh | INSTALL_RKE2_MIRROR=cn INSTALL_RKE2_VERSION={{ rke2_version }} sh -
+        args:
+            executable: /bin/bash
+        when: rke2_result.stat.exists == False
+        register: rke2_install_result
+
+      - name: Configure external containerd
+        block:
+            - name: Enable and start containerd service
+              systemd:
+                  name: containerd
+                  state: started
+                  enabled: yes
+
+            - name: Configure Containerd
+              shell: containerd config default > /etc/containerd/config.toml
+        when: use_external_containerd | lower == "yes"
+
+      - name: Create RKE2 configuration directory
+        file:
+            path: /etc/rancher/rke2/
+            state: directory
+
+      - name: Configure RKE2
+        copy:
+            content: |
+                service-node-port-range: {{ service_node_port_range }}
+                cni: {{ cni }}
+                kubelet-arg: "--max-pods=200"
+                container-runtime-endpoint: unix:///run/containerd/containerd.sock
+            dest: /etc/rancher/rke2/config.yaml
+        when: use_external_containerd | lower == "yes"
+
+      - name: Configure RKE2 without external containerd
+        copy:
+            content: |
+                service-node-port-range: {{ service_node_port_range }}
+                cni: {{ cni }}
+                kubelet-arg: "--max-pods=200"
+            dest: /etc/rancher/rke2/config.yaml
+        when: use_external_containerd | lower != "yes"
+
+      - name: Configure PATH
+        lineinfile:
+            path: /etc/profile
+            line: "export PATH=$PATH:/var/lib/rancher/rke2/bin"
+
+      - name: Configure crictl
+        block:
+            - name: Generate containerd configuration
+              command: containerd config default > /etc/containerd/config.toml
+
+            - name: Write crictl configuration
+              copy:
+                  content: |
+                      runtime-endpoint: unix:///run/k3s/containerd/containerd.sock
+                      image-endpoint: unix:///run/k3s/containerd/containerd.sock
+                      timeout: 10
+                      debug: false
+                  dest: /etc/crictl.yaml
+
+      - name: Add Kubectl to path
+        lineinfile:
+            path: /etc/profile
+            line: "export PATH=$PATH:/var/lib/rancher/rke2/bin"
+
+      - name: Enable RKE2 Server Service
+        systemd:
+            name: rke2-server.service
+            enabled: yes
+            # state: started

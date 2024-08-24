@@ -1,0 +1,181 @@
+---
+- name: Prepare system for Kubernetes
+  hosts: all
+  become: yes
+  tasks:
+      - name: Check operating system
+        fail:
+            msg: "This playbook can only be run on Ubuntu."
+        when: ansible_distribution not in ['CentOS', 'AlmaLinux', 'Rocky']
+
+      - name: Configure io watcher
+        sysctl:
+            name: fs.inotify.max_user_instances
+            value: "8192"
+            state: present
+            reload: yes
+
+      - name: Disable SELinux
+        block:
+            - name: Check if SELinux is enforcing
+              command: getenforce
+              register: selinux_status
+              changed_when: False
+
+            - name: Disable SELinux if it is enforcing
+              block:
+                  - name: Set SELinux to Permissive
+                    command: setenforce 0
+
+                  - name: Make SELinux change persistent
+                    lineinfile:
+                        path: /etc/selinux/config
+                        regexp: "^SELINUX="
+                        line: "SELINUX=disabled"
+              when: selinux_status.stdout == "Enforcing"
+
+      - name: Configure DNF
+        block:
+            - name: Enable crb on DNF
+              command: dnf config-manager --set-enabled crb
+
+            - name: Install EPEL
+              dnf:
+                  name:
+                      - epel-release
+                  state: latest
+
+            - name: Install packages
+              dnf:
+                  name:
+                      - openssh-server
+                      - zsh
+                      - git
+                      - vim
+                      - curl
+                      - wget
+                      - htop
+                      - net-tools
+                      - iftop
+                      - dnsutils
+                      - nfs-utils
+                      - tmux
+                      - cockpit
+                      - iscsi-initiator-utils # for longhorn
+                      - cryptsetup # for longhorn
+                      - jq # for longhorn check script
+                  state: latest
+
+      - name: Enable and start ISCSI
+        systemd:
+            name: iscsid
+            state: started
+            enabled: yes
+
+      - name: Create NetworkManager configuration file
+        copy:
+            dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+            content: |
+                [keyfile]
+                unmanaged-devices=interface-name:cali*;interface-name:flannel*
+            owner: root
+            group: root
+            mode: "0644"
+
+      - name: Reload NetworkManager
+        systemd:
+            name: NetworkManager
+            state: reloaded
+
+      - name: Disable firewalld # firewalld is incompatible with Calico
+        systemd:
+            name: firewalld
+            state: stopped
+            enabled: no
+
+- name: Install RKE2 Agent
+  hosts: all
+  become: yes
+  vars_prompt:
+    - name: "server_hostname"
+      prompt: "What is the server hostname (reachable from agent)"
+      private: no
+
+    - name: "server_token"
+      prompt: "Enter the token"
+      private: yes
+
+    - name: "use_external_containerd"
+      prompt: "Do you want to use external containerd? (yes/no)"
+      private: no
+      default: "no"
+
+    - name: "rke2_version"
+      prompt: "Enter RKE2 version"
+      default: "v1.25.11+rke2r1"
+      private: no
+
+  tasks:
+    - name: Check if /usr/bin/rke2 exists
+      stat:
+        path: /usr/bin/rke2
+      register: rke2_result
+
+    - name: Install RKE2
+      shell: |
+        curl -sfL https://rancher-mirror.rancher.cn/rke2/install.sh | INSTALL_RKE2_MIRROR=cn INSTALL_RKE2_TYPE="agent" INSTALL_RKE2_VERSION={{ rke2_version }} sh -
+      args:
+        executable: /bin/bash
+      when: rke2_result.stat.exists == False
+
+    - name: Configure external containerd
+      block:
+          - name: Enable and start containerd service
+            systemd:
+                name: containerd
+                state: started
+                enabled: yes
+
+          - name: Configure Containerd
+            shell: containerd config default > /etc/containerd/config.toml
+      when: use_external_containerd | lower == "yes"
+
+    - name: Create RKE2 configuration directory
+      file:
+          path: /etc/rancher/rke2/
+          state: directory
+
+    - name: Configure Rancher
+      copy:
+        dest: /etc/rancher/rke2/config.yaml
+        content: |
+          server: https://{{ server_hostname }}:9345
+          token: {{ server_token }}
+          kubelet-arg: "--max-pods=200"
+          container-runtime-endpoint: unix:///run/containerd/containerd.sock
+      when: use_external_containerd == "yes"
+
+    - name: Configure Rancher without external containerd
+      copy:
+        dest: /etc/rancher/rke2/config.yaml
+        content: |
+          server: https://{{ server_hostname }}:9345
+          token: {{ server_token }}
+          kubelet-arg: "--max-pods=200"
+      when: use_external_containerd == "no"
+
+    - name: Prepare images
+      shell: |
+        ctr -n k8s.io image pull docker.io/rancher/pause:3.6
+        ctr -n k8s.io image tag docker.io/rancher/pause:3.6 registry.k8s.io/pause:3.6
+      when: use_external_containerd == "yes"
+
+    - name: Enable RKE2 Agent service
+      systemd:
+        name: rke2-agent.service
+        enabled: yes
+        # state: started
+
+    - debug:
+        msg: "RKE2 Agent installed successfully, you can start the agent manually by running 'systemctl start rke2-agent.service'"
+...

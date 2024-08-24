@@ -1,3 +1,4 @@
+---
 - name: Prepare system for Kubernetes
   hosts: all
   become: yes
@@ -5,7 +6,7 @@
       - name: Check operating system
         fail:
             msg: "This playbook can only be run on Ubuntu."
-        when: ansible_distribution != 'Ubuntu'
+        when: ansible_distribution not in ['CentOS', 'AlmaLinux', 'Rocky']
 
       - name: Configure io watcher
         sysctl:
@@ -13,6 +14,63 @@
             value: "8192"
             state: present
             reload: yes
+
+      - name: Disable SELinux
+        block:
+            - name: Check if SELinux is enforcing
+              command: getenforce
+              register: selinux_status
+              changed_when: False
+
+            - name: Disable SELinux if it is enforcing
+              block:
+                  - name: Set SELinux to Permissive
+                    command: setenforce 0
+
+                  - name: Make SELinux change persistent
+                    lineinfile:
+                        path: /etc/selinux/config
+                        regexp: "^SELINUX="
+                        line: "SELINUX=disabled"
+              when: selinux_status.stdout == "Enforcing"
+
+      - name: Configure DNF
+        block:
+            - name: Enable crb on DNF
+              command: dnf config-manager --set-enabled crb
+
+            - name: Install EPEL
+              dnf:
+                  name:
+                      - epel-release
+                  state: latest
+
+            - name: Install packages
+              dnf:
+                  name:
+                      - openssh-server
+                      - zsh
+                      - git
+                      - vim
+                      - curl
+                      - wget
+                      - htop
+                      - net-tools
+                      - iftop
+                      - dnsutils
+                      - nfs-utils
+                      - tmux
+                      - cockpit
+                      - iscsi-initiator-utils # for longhorn
+                      - cryptsetup # for longhorn
+                      - jq # for longhorn check script
+                  state: latest
+
+      - name: Enable and start ISCSI
+        systemd:
+            name: iscsid
+            state: started
+            enabled: yes
 
       - name: Create NetworkManager configuration file
         copy:
@@ -29,9 +87,9 @@
             name: NetworkManager
             state: reloaded
 
-      - name: Disable UFW # UFW is incompatible with Calico
+      - name: Disable firewalld # firewalld is incompatible with Calico
         systemd:
-            name: ufw
+            name: firewalld
             state: stopped
             enabled: no
 
