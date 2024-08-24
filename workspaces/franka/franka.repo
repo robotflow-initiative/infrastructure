@@ -1,0 +1,26 @@
+repositories:
+  src/aruco_ros:
+    type: git
+    url: https://github.com/pal-robotics/aruco_ros.git
+    version: 3.1.4  # 3.x for ros1 and 5.x for ros2
+
+  src/azure_kinect_ros_driver:
+    type: git
+    url: https://github.com/microsoft/Azure_Kinect_ROS_Driver.git
+    version: melodic  # or the specific branch/tag you want to use
+
+  src/easy_handeye:
+    type: git
+    url: https://github.com/IFL-CAMP/easy_handeye.git
+    version: master  # or the specific branch/tag you want to use
+
+  src/panda_moveit_config:
+    type: git
+    url: https://github.com/ros-planning/panda_moveit_config.git
+    version: 0.8.1  # or the specific branch/tag you want to use
+
+  src/franka_ros:
+    type: git
+    url: https://github.com/frankaemika/franka_ros.git
+    version: 0.10.2  # or the specific branch/tag you want to use
+    recursive: true

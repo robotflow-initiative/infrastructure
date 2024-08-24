@@ -1,0 +1,74 @@
+---
+- name: Install Azure Kinect Sensor SDK
+  hosts: all
+  become: yes
+  vars:
+      k4a_pkgs:
+          - k4a-tools
+          - libk4a1.4
+          - libk4a1.4-dev
+  tasks:
+      - name: Gather OS Distribution
+        command: lsb_release -rs
+        register: distro_release
+
+      - name: Check Operating System
+        block:
+            - name: Check if OS is Ubuntu
+              fail:
+                  msg: "This playbook is only for Ubuntu"
+              when: ansible_distribution != 'Ubuntu'
+
+      - name: Install Azure Kinect Sensor SDK (k4a)
+        apt:
+            name: "{{ item }}"
+            state: present
+        with_items: "{{ k4a_pkgs }}"
+        register: k4a_install_output
+        ignore_errors: yes
+
+      - name: Abort if k4a is already installed
+        fail:
+            msg: "Azure Kinect Sensor SDK is already installed."
+        when: k4a_install_output is succeeded
+
+      - name: Download and install the packages-microsoft-prod.deb package
+        block:
+            - name: Download the packages-microsoft-prod.deb package
+              get_url:
+                  url: https://packages.microsoft.com/config/ubuntu/18.04/packages-microsoft-prod.deb # only 18.04 is supported
+                  dest: /tmp/packages-microsoft-prod.deb
+
+            - name: Install the packages-microsoft-prod.deb package
+              apt:
+                  deb: /tmp/packages-microsoft-prod.deb
+
+            - name: Clean up downloaded package
+              file:
+                  path: /tmp/packages-microsoft-prod.deb
+                  state: absent
+
+            - name: Add Microsoft GPG key
+              apt_key:
+                  url: https://packages.microsoft.com/keys/microsoft.asc
+                  state: present
+
+            - name: Update apt cache after adding Microsoft repository
+              apt:
+                  update_cache: yes
+        when: k4a_install_output is failed 
+
+      - name: Install Azure Kinect Sensor SDK (k4a)
+        apt:
+            name: "{{ item }}"
+            state: present
+        with_items: "{{ k4a_pkgs }}"
+
+      - name: Verify k4a installation
+        command: k4aviewer --version
+        register: k4a_version_output
+        ignore_errors: yes
+
+      - name: Display k4a installation status
+        debug:
+            msg: "{{ k4a_version_output.stdout if k4a_version_output.rc == 0 else 'Azure Kinect Sensor SDK installation failed.' }}"
