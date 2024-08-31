@@ -35,9 +35,16 @@ Install other dependencies via apt:
 
 ```shell
 export ROS_DISTRO=noetic
-sudo apt install python3-pip ros-${ROS_DISTRO}-libfranka ros-${ROS_DISTRO}-moveit
+sudo apt-get install -y \
+    python3-pip \
+    ros-${ROS_DISTRO}-libfranka \
+    ros-${ROS_DISTRO}-panda-moveit-config \
+    ros-${ROS_DISTRO}-franka-ros \
+    ros-${ROS_DISTRO}-moveit
 rosdep install --from-path src --ignore-src --rosdistro ${ROS_DISTRO} -y --skip-keys libfranka
 ```
+
+> This [script](./setup_deps.sh) can be used to install the dependencies.
 
 Compile the workspace:
 
@@ -46,6 +53,14 @@ catkin_make -DCMAKE_BUILD_TYPE=Release
 ```
 
 > Note: the `azure_kinect_ros_driver` is depends on `k4a` library, which is not available in the default apt repository. You can install it via the [azure_kinect_k4a.yml](../../playbooks/driver/azure_kinect_k4a.yml) playbook.
+
+## Example
+
+Launch the moveit configuration:
+
+```shell
+roslaunch panda_moveit_config franka_control.launch robot_ip:=172.16.0.2 load_gripper:=true
+```
 
 ### ROS works with conda
 

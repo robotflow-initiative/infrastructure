@@ -28,7 +28,7 @@
             name:
                 - build-essential
                 - dkms
-                - gcc
+                - gcc # kernel 6.x need gcc-12
                 - linux-headers-{{ ansible_kernel }}
             state: present
 
@@ -65,5 +65,5 @@
             name: nvidia-driver-{{ nvidia_driver_version }}
             state: present
 
-      - warn:
+      - debug:
             msg: "Please reboot your system to load the new NVIDIA driver"

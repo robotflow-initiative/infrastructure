@@ -104,13 +104,58 @@
       - name: "service_node_port_range"
         prompt: "Enter service-node-port-range"
         default: "30000-40000"
+        private: no
       - name: "cni"
         prompt: "Enter cni"
         default: "canal"
+        private: no
       - name: "rke2_version"
         prompt: "Enter RKE2 version"
         default: "v1.25.11+rke2r1"
+        private: no
   tasks:
+      - name: Check if /usr/bin/docker exists
+        stat:
+            path: /usr/bin/docker
+        register: docker_result
+
+      - name: Install Docker
+        block:
+          - name: Check if Docker repo is reachable
+            shell:
+              cmd: curl -Is --max-time 5 https://download.docker.com/linux/centos/docker-ce.repo | head -n 1 | grep "200\|301"
+            register: repo_status
+            ignore_errors: true
+
+          - name: Add Docker repo
+            command: >
+              dnf config-manager --add-repo {{ 'https://download.docker.com/linux/centos/docker-ce.repo' if (repo_status.rc == 0) else 'https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo' }}      
+
+          - name: Install Docker packages
+            dnf:
+              name:
+                - docker-ce
+                - docker-ce-cli
+                - containerd.io
+              state: latest
+
+          - name: Install Python pip
+            dnf:
+              name: python3-pip
+              state: latest
+
+          - name: Install Docker Compose
+            pip:
+              name: docker-compose
+              executable: pip3
+
+          - name: Start and enable Docker service
+            systemd:
+              name: docker
+              state: started
+              enabled: yes
+        when: docker_result.stat.exists == False
+
       - name: Check if /usr/bin/docker exists
         stat:
             path: /usr/bin/docker

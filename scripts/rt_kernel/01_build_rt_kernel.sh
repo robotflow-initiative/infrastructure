@@ -89,7 +89,7 @@ cp /boot/config-$(uname -r) .config
 yes '' | make oldconfig
 
 # Enable RT_PREEMPT
-./scripts/config --enable CONFIG_PREEMPT
+./scripts/config --enable CONFIG_PREEMPT_RT
 ./scripts/config --enable CONFIG_PREEMPT_DYNAMIC
 ./scripts/config --enable CONFIG_HIGH_RES_TIMERS
 ./scripts/config --enable CONFIG_NO_HZ_FULL

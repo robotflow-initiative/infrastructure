@@ -19,8 +19,8 @@ repositories:
     url: https://github.com/ros-planning/panda_moveit_config.git
     version: 0.8.1  # or the specific branch/tag you want to use
 
-  src/franka_ros:
-    type: git
-    url: https://github.com/frankaemika/franka_ros.git
-    version: 0.10.2  # or the specific branch/tag you want to use
-    recursive: true
+  ; src/franka_ros:
+  ;   type: git
+  ;   url: https://github.com/frankaemika/franka_ros.git
+  ;   version: 0.10.2  # or the specific branch/tag you want to use
+  ;   recursive: true
