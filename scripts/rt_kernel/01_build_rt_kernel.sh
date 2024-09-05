@@ -1,6 +1,8 @@
 #!/bin/bash
 
-
+KERNEL_SRC_DIR=${KERNEL_SRC_DIR:-/opt/kernel/src}
+echo "Kernel source directory: $KERNEL_SRC_DIR"
+mkdir -p "$KERNEL_SRC_DIR"
 
 # Function to prompt for input
 prompt_input() {
@@ -11,7 +13,7 @@ prompt_input() {
 # Prompt for kernel version, RT kernel version, and secure boot
 kernel_version=$(prompt_input "Enter the kernel version, this should match the version of the kernel you are running. (e.g. 5.15.113)" "")
 rt_kernel_version=$(prompt_input "Enter the RT kernel subversion. (e.g. rt64)" "")
-secure_boot=$(prompt_input "Is UEFI Secure Boot enabled? (yes/no)" "no")
+# secure_boot=$(prompt_input "Is UEFI Secure Boot enabled? (yes/no)" "no")
 
 # Abort if RT kernel version is not provided
 if [[ -z "$rt_kernel_version" ]]; then
@@ -22,15 +24,17 @@ fi
 # Check if the current kernel is an RT kernel
 current_kernel=$(uname -r)
 if [[ "$current_kernel" == *rt* ]]; then
-    echo "Current kernel is an RT kernel. Aborting."
-    exit 1
+    continue=$(prompt_input "Current kernel is an RT kernel. Are you sure you want to continue? (yes/no)" "no")
+    if [[ "$continue" != "yes" ]]; then
+        exit 0
+    fi
 fi
 
 # Extract major version of the kernel
 rt_kernel_major_version=$(echo "$kernel_version" | cut -d'.' -f1,2)
 
 # Create directory for kernel source
-mkdir -p /opt/kernel/src/${kernel_version}
+mkdir -p ${KERNEL_SRC_DIR}/${kernel_version}
 
 # Install necessary dependencies
 dependencies=(
@@ -51,22 +55,30 @@ dependencies=(
     zstd
     dwarves
 )
-apt-get update
-apt-get install -y "${dependencies[@]}"
+
+# Use sudo if not running as root
+if [[ $EUID -ne 0 ]]; then
+    sudo apt-get update
+    sudo apt-get install -y "${dependencies[@]}"
+else
+    apt-get update
+    apt-get install -y "${dependencies[@]}"
+fi
 
 set -e
 
 # Download kernel source if it doesn't exist
-kernel_tarball="/opt/kernel/src/${kernel_version}/linux-${kernel_version}.tar.xz"
+kernel_tarball="${KERNEL_SRC_DIR}/${kernel_version}/linux-${kernel_version}.tar.xz"
 if [[ ! -f "$kernel_tarball" ]]; then
-    wget -O "$kernel_tarball" "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-${kernel_version}.tar.xz"
+    wget -O "$kernel_tarball" "https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-${kernel_version}.tar.xz" || 
+        wget -O "$kernel_tarball" "https://mirrors.edge.kernel.org/pub/linux/kernel/v6.x/linux-${kernel_version}.tar.xz" 
 fi
 
 # Download RT patch
-rt_patch="/opt/kernel/src/${kernel_version}/patch-${kernel_version}-${rt_kernel_version}.patch.xz"
+rt_patch="${KERNEL_SRC_DIR}/${kernel_version}/patch-${kernel_version}-${rt_kernel_version}.patch.xz"
 if [[ ! -f "$rt_patch" ]]; then
-    wget -O "$rt_patch" "https://mirrors.edge.kernel.org/pub/linux/kernel/projects/rt/${rt_kernel_major_version}/patch-${kernel_version}-${rt_kernel_version}.patch.xz" || \
-    wget -O "$rt_patch" "https://mirrors.edge.kernel.org/pub/linux/kernel/projects/rt/${rt_kernel_major_version}/older/patch-${kernel_version}-${rt_kernel_version}.patch.xz"
+    wget -O "$rt_patch" "https://mirrors.edge.kernel.org/pub/linux/kernel/projects/rt/${rt_kernel_major_version}/patch-${kernel_version}-${rt_kernel_version}.patch.xz" ||
+        wget -O "$rt_patch" "https://mirrors.edge.kernel.org/pub/linux/kernel/projects/rt/${rt_kernel_major_version}/older/patch-${kernel_version}-${rt_kernel_version}.patch.xz"
 fi
 
 # Check if the RT patch exists
@@ -75,11 +87,10 @@ if [[ ! -f "$rt_patch" ]]; then
     exit 1
 fi
 # Extract kernel source
-rm -rf /opt/kernel/src/${kernel_version}/linux-${kernel_version} && tar -xf "$kernel_tarball" -C /opt/kernel/src/${kernel_version}
-
+rm -rf ${KERNEL_SRC_DIR}/${kernel_version}/linux-${kernel_version} && tar -xf "$kernel_tarball" -C ${KERNEL_SRC_DIR}/${kernel_version}
 
 # Apply RT patch
-cd "/opt/kernel/src/${kernel_version}/linux-${kernel_version}/" || exit
+cd "${KERNEL_SRC_DIR}/${kernel_version}/linux-${kernel_version}/" || exit
 xzcat "$rt_patch" | patch -p1
 
 # Copy the running config
@@ -104,7 +115,6 @@ yes '' | make oldconfig
 # Optional: disable SYSTEM_TRUSTED_KEYS and SYSTEM_REVOCATION_KEYS
 ./scripts/config --disable SYSTEM_TRUSTED_KEYS
 ./scripts/config --disable SYSTEM_REVOCATION_KEYS
-
 
 # Optional:  build the deb-pkg
 make -j$(nproc) deb-pkg
