@@ -1,0 +1,34 @@
+---
+- name: Install and configure Fail2ban
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Install epel-release for RockyLinux
+      yum:
+        name: epel-release
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Fail2ban
+      package:
+        name: fail2ban
+        state: present
+
+    - name: Enable and start Fail2ban service
+      systemd:
+        name: fail2ban
+        enabled: yes
+        state: started
+
+    - name: Copy jail.conf to jail.local
+      copy:
+        src: /etc/fail2ban/jail.conf
+        dest: /etc/fail2ban/jail.local
+        remote_src: yes
+
+    - name: Copy fail2ban.conf to fail2ban.local
+      copy:
+        src: /etc/fail2ban/fail2ban.conf
+        dest: /etc/fail2ban/fail2ban.local
+        remote_src: yes

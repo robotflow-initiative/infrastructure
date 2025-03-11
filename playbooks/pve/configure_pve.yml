@@ -15,6 +15,7 @@
     - name: Update apt repository
       apt:
         update_cache: yes
+      ignore_errors: true
 
     - name: Install essential packages
       apt:
@@ -24,13 +25,6 @@
           - git
           - curl
         state: present
-
-    - name: Generate SSH key
-      user:
-        name: "{{ ansible_user }}"
-        generate_ssh_key: yes
-        ssh_key_bits: 2048
-        ssh_key_file: .ssh/id_rsa
 
     - name: Import SSH keys from GitHub
       shell: "curl -s https://github.com/{{ github_username }}.keys >> .ssh/authorized_keys"
@@ -90,6 +84,10 @@
           - nano
           - sudo
           - openvswitch-switch
+          - jq
+          - git
+          - curl
+          - wget
         state: present
 
     - name: Install Infiniband related packages

@@ -1,0 +1,45 @@
+---
+- name: Configure Proxmox Server on Debian Bookworm with Ceph Quincy
+  hosts: all
+  become: yes
+  tasks:
+    # Step 1: Disable the official Proxmox repo and configure the USTC mirror
+    - name: Disable official Proxmox repo
+      copy:
+        dest: /etc/apt/sources.list.d/pve-enterprise.list
+        content: ""
+
+    - name: Add USTC mirror for Debian Bookworm
+      copy:
+        dest: /etc/apt/sources.list
+        content: |
+          deb https://mirrors.ustc.edu.cn/debian/ bookworm main contrib non-free
+          deb https://mirrors.ustc.edu.cn/debian/ bookworm-updates main contrib non-free
+          deb https://mirrors.ustc.edu.cn/debian/ bookworm-backports main contrib non-free
+          deb https://mirrors.ustc.edu.cn/debian-security bookworm-security main contrib non-free
+
+    # Step 2: Enable the Ceph Quincy repo
+    - name: Add Ceph Quincy repository
+      copy:
+        dest: /etc/apt/sources.list.d/ceph.list
+        content: |
+          deb https://mirrors.ustc.edu.cn/proxmox/debian/ceph-quincy/ bookworm no-subscription
+
+    # Step 3: Disable the Proxmox enterprise repo
+    - name: Disable Proxmox enterprise repo
+      file:
+        path: /etc/apt/sources.list.d/pve-enterprise.list
+        state: absent
+        
+     # Step 4: Enable Proxmox-no-subscription repo
+     - name : Enable Proxmox-no-subscription repo
+       copy:
+         dest: /etc/apt/sources.list.d/pve-no-subscription.list
+         content: |
+           deb https://mirrors.ustc.edu.cn/proxmox/debian/pve bookworm pve-no-subscription
+
+    # Step 5: Update apt repository
+    - name: Update apt repository
+      apt:
+        update_cache: yes
+      ignore_errors: true

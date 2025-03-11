@@ -1,0 +1,29 @@
+---
+- name: Configure Proxmox Server on Debian Bookworm with Ceph Quincy
+  hosts: all
+  become: yes
+  tasks:
+
+    # Step 1: Enable IOMMU and PCIe ACS override by modifying /etc/kernel/cmdline
+    - name: Enable IOMMU and PCIe ACS override in kernel command line
+      copy:
+        dest: /etc/kernel/cmdline
+        content: "root=ZFS=rpool/ROOT/pve-1 intel_iommu=on iommu=pt pcie_acs_override=downstream quiet"
+        force: yes
+
+    - name: Use pve-efiboot-tool to update kernel configuration
+      command: pve-efiboot-tool refresh
+
+    - name: Add VFIO modules to /etc/modules
+      lineinfile:
+        path: /etc/modules
+        line: "{{ item }}"
+        create: yes
+      loop:
+        - vfio
+        - vfio_iommu_type1
+        - vfio_pci
+        - vfio_virqfd
+      loop_control:
+        loop_var: item
+      tags: vfio_modules

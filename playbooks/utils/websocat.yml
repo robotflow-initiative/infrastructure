@@ -1,0 +1,12 @@
+---
+- hosts: all
+  become: yes
+  vars:
+    websocat_version: "1.13.0"
+    machine: x86_64   # replace with your specific machine architecture (eg, amd64)
+  tasks:
+    - name: Download websocat
+      get_url:
+        url: "https://github.com/vi/websocat/releases/download/v{{ websocat_version }}/websocat.{{ machine }}-unknown-linux-musl"
+        dest: "/usr/local/bin/websocat"
+        mode: '0755'

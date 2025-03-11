@@ -1,0 +1,169 @@
+---
+- name: The playbook for configuring the system
+  hosts: all
+  become: yes
+  vars_prompt:
+    - name: "use_external_containerd"
+      prompt: "Do you want to use external containerd? (yes/no)"
+      private: no
+      default: "no"
+    - name: "install_docker"
+      prompt: "Do you want to install Docker? (yes/no)"
+      private: no
+      default: "yes"
+    - name: "new_hostname"
+      prompt: "Please input the new hostname for the server or press enter to skip."
+      private: no
+      default: ""
+
+  tasks:
+    - name: Check operating system
+      fail:
+        msg: "This playbook can only be run on CentOS, AlmaLinux or Rocky Linux."
+      when: ansible_distribution not in ['CentOS', 'AlmaLinux', 'Rocky']
+
+    - name: Set hostname permanently
+      hostname:
+        name: "{{ new_hostname }}"
+      when: new_hostname != ""
+
+    - name: Disable SELinux
+      block:
+        - name: Check if SELinux is enforcing
+          command: getenforce
+          register: selinux_status
+          changed_when: False
+
+        - name: Disable SELinux if it is enforcing
+          block:
+            - name: Set SELinux to Permissive
+              command: setenforce 0
+
+            - name: Make SELinux change persistent
+              lineinfile:
+                path: /etc/selinux/config
+                regexp: '^SELINUX='
+                line: 'SELINUX=disabled'
+          when: selinux_status.stdout == "Enforcing"
+
+    - name: Configure io watcher
+      sysctl:
+        name: fs.inotify.max_user_instances
+        value: '8192'
+        state: present
+        reload: yes
+
+    - name: Configure DNF
+      block:
+        - name: Enable crb on DNF
+          command: dnf config-manager --set-enabled crb
+
+        - name: Install EPEL
+          dnf:
+            name:
+              - epel-release
+            state: latest
+
+        - name: Install packages
+          dnf:
+            name:
+              - openssh-server
+              - zsh
+              - git
+              - vim
+              - curl
+              - wget
+              - htop
+              - net-tools
+              - iftop
+              - dnsutils
+              - nfs-utils
+              - tmux
+              - cockpit
+              - iscsi-initiator-utils # for longhorn
+              - cryptsetup # for longhorn
+              - jq # for longhorn check script
+            state: latest
+
+    - name: Install Docker
+      block:
+        - name: Check if Docker repo is reachable
+          shell:
+            cmd: curl -Is --max-time 5 https://download.docker.com/linux/centos/docker-ce.repo | head -n 1 | grep "200\|301"
+          register: repo_status
+          ignore_errors: true
+
+        - name: Add Docker repo
+          command: >
+            dnf config-manager --add-repo {{ 'https://download.docker.com/linux/centos/docker-ce.repo' if (repo_status.rc == 0) else 'https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo' }}
+
+        - name: Install Docker packages
+          dnf:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: latest
+
+        - name: Install Python pip
+          dnf:
+            name: python3-pip
+            state: latest
+
+        - name: Install Docker Compose
+          pip:
+            name: docker-compose
+            executable: pip3
+
+        - name: Start and enable Docker service
+          systemd:
+            name: docker
+            state: started
+            enabled: yes
+      when: install_docker | lower == "yes"
+
+    - name: Configure Containerd
+      block:
+        - name: Install containerd.io
+          command: dnf install containerd.io -y
+        - name: Enable and start containerd service
+          systemd:
+            name: containerd
+            state: started
+            enabled: yes
+        - name: Configure Containerd
+          command: containerd config default > /etc/containerd/config.toml
+      when: use_external_containerd | lower == "yes"
+
+    - name: Enable and start ISCSI
+      systemd:
+        name: iscsid
+        state: started
+        enabled: yes
+
+    # - name: Configure Cockpit
+    #   systemd:
+    #     name: cockpit.socket
+    #     state: started
+    #     enabled: yes
+
+    - name: Create NetworkManager configuration file
+      copy:
+        dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+        content: |
+          [keyfile]
+          unmanaged-devices=interface-name:cali*;interface-name:flannel*
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Reload NetworkManager
+      systemd:
+        name: NetworkManager
+        state: reloaded
+
+    - name: Disable firewalld # firewalld is incompatible with Calico
+      systemd:
+        name: firewalld
+        state: stopped
+        enabled: no
